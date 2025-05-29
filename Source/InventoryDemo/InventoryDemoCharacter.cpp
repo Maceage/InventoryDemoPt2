@@ -11,6 +11,9 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 
+#include "Item_Usable.h"
+#include "InventoryComponent.h"
+
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 //////////////////////////////////////////////////////////////////////////
@@ -50,6 +53,10 @@ AInventoryDemoCharacter::AInventoryDemoCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -67,6 +74,24 @@ void AInventoryDemoCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
+	if (InventoryComponent)
+	{
+		InventoryComponent->ItemEquippedDelegate.BindUObject(this, &AInventoryDemoCharacter::InventoryItemAdded);
+		InventoryComponent->ItemRemovedDelegate.BindUObject(this, &AInventoryDemoCharacter::InventoryItemRemoved);
+	}
+}
+
+void AInventoryDemoCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (InventoryComponent)
+	{
+		InventoryComponent->ItemEquippedDelegate.Unbind();
+		InventoryComponent->ItemRemovedDelegate.Unbind();
+	}
+
+	// Call the base class  
+	Super::EndPlay(EndPlayReason);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -127,4 +152,90 @@ void AInventoryDemoCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+//Inventory
+bool AInventoryDemoCharacter::AddInventoryItem(AItem_Usable* InItem)
+{
+	const int32 oldItemCount = InventoryComponent->GetNumItems();
+
+	//option to display msg in log that inventory was being tried to be added but inventory is full
+	if ( oldItemCount < static_cast<int32>(EInventorySlotType::Count) )
+	{
+		InventoryComponent->AddItem(InItem);
+	}
+
+	const int32 newItemCount = InventoryComponent->GetNumItems();
+	return newItemCount > oldItemCount;
+	
+}
+
+void AInventoryDemoCharacter::RemoveInventoryItem(AItem_Usable* InItem)
+{
+
+}
+
+
+void AInventoryDemoCharacter::InventoryItemAdded(AItem_Usable* InItem)
+{
+	OnInventoryItemAdded(InItem);
+}
+
+
+void AInventoryDemoCharacter::InventoryItemRemoved(AItem_Usable* InItem)
+{
+	OnInventoryItemRemoved(InItem);
+}
+
+void AInventoryDemoCharacter::EquipItem(EInventorySlotType Slot)
+{
+	if (InventoryComponent->GetNumItems() > 0)
+	{
+		//if item is equipped then we don't do anything
+		if(!EquippedItem)
+		{
+			//add functionality to select either primary or secondary
+			//can also use different inputs
+			switch (Slot)
+			{
+			case EInventorySlotType::Primary:
+				EquippedItem = InventoryComponent->GetItems()[static_cast<int>(Slot)];
+				break;
+			case EInventorySlotType::Secondary:
+				if (InventoryComponent->GetNumItems() > static_cast<int>(EInventorySlotType::Secondary))
+				{
+					EquippedItem = InventoryComponent->GetItems()[static_cast<int>(Slot)];
+				}
+				break;
+			case EInventorySlotType::Count:
+				EquippedItem = InventoryComponent->GetItems()[0];
+				break;
+			default:
+				break;
+			}
+		}
+	}
+}
+
+void AInventoryDemoCharacter::UnequipItem()
+{
+
+}
+
+
+void AInventoryDemoCharacter::DropItem()
+{
+
+}
+
+
+void AInventoryDemoCharacter::DrawItem()
+{
+
+}
+
+
+void AInventoryDemoCharacter::HolsterItem()
+{
+
 }
